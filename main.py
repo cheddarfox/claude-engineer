@@ -11,6 +11,8 @@ import pygments.util
 import base64
 from PIL import Image
 import io
+from dotenv import load_dotenv
+
 
 # Initialize colorama
 init()
@@ -21,11 +23,14 @@ CLAUDE_COLOR = Fore.BLUE
 TOOL_COLOR = Fore.YELLOW
 RESULT_COLOR = Fore.GREEN
 
+# Load environment variables from .env file
+load_dotenv()
+
 # Initialize the Anthropic client
-client = Anthropic(api_key="YOUR_API_KEY")
+client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 # Initialize the Tavily client
-tavily = TavilyClient(api_key="YOUR_API_KEY")
+tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
 # Set up the conversation memory
 conversation_history = []
