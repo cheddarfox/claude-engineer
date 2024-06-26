@@ -6,6 +6,7 @@ analyze its capabilities, and suggest potential improvements.
 """
 
 from time_utils import get_timestamp, get_time_difference
+from error_handling import SelfReflectionError, log_info, log_error
 
 class SelfReflection:
     """
@@ -21,9 +22,15 @@ class SelfReflection:
 
         Args:
             capability_registry (CapabilityRegistry): The system's capability registry.
+
+        Raises:
+            SelfReflectionError: If capability_registry is None.
         """
+        if capability_registry is None:
+            raise SelfReflectionError("Capability registry cannot be None")
         self.capability_registry = capability_registry
         self.performance_log = []
+        log_info("SelfReflection instance initialized")
 
     def log_performance(self, task, result, execution_time):
         """
@@ -33,13 +40,22 @@ class SelfReflection:
             task (str): The name of the task performed.
             result: The result of the task execution.
             execution_time (float): The time taken to execute the task, in seconds.
+
+        Raises:
+            SelfReflectionError: If input parameters are invalid.
         """
+        if not isinstance(task, str) or not task.strip():
+            raise SelfReflectionError("Task must be a non-empty string")
+        if not isinstance(execution_time, (int, float)) or execution_time < 0:
+            raise SelfReflectionError("Execution time must be a non-negative number")
+
         self.performance_log.append({
             "task": task,
             "result": result,
             "execution_time": execution_time,
             "timestamp": get_timestamp()
         })
+        log_info(f"Performance logged for task: {task}")
 
     def analyze_performance(self):
         """
@@ -49,6 +65,7 @@ class SelfReflection:
             str: A string containing the performance analysis report.
         """
         if not self.performance_log:
+            log_info("Performance analysis attempted with no data")
             return "No performance data available."
 
         total_tasks = len(self.performance_log)
@@ -72,6 +89,7 @@ class SelfReflection:
             total_runtime = get_time_difference(start_time, end_time)
             analysis += f"\nTotal runtime: {total_runtime:.2f} seconds\n"
 
+        log_info("Performance analysis completed")
         return analysis
 
     def suggest_improvements(self):
@@ -81,7 +99,12 @@ class SelfReflection:
         Returns:
             list: A list of improvement suggestions.
         """
-        available_capabilities = self.capability_registry.list_capabilities()
+        try:
+            available_capabilities = self.capability_registry.list_capabilities()
+        except Exception as e:
+            log_error(f"Error accessing capability registry: {str(e)}")
+            raise SelfReflectionError("Unable to access capability registry") from e
+
         missing_capabilities = [
             "natural_language_processing",
             "image_recognition",
@@ -94,11 +117,15 @@ class SelfReflection:
             if capability not in available_capabilities:
                 suggestions.append(f"Consider adding '{capability}' to enhance overall functionality.")
 
+        log_info(f"Generated {len(suggestions)} improvement suggestions")
         return suggestions if suggestions else ["No immediate suggestions for new capabilities."]
 
 # Example usage:
-# registry = CapabilityRegistry()
-# self_reflection = SelfReflection(registry)
-# self_reflection.log_performance("text_analysis", "Completed successfully", 0.5)
-# print(self_reflection.analyze_performance())
-# print(self_reflection.suggest_improvements())
+# try:
+#     registry = CapabilityRegistry()
+#     self_reflection = SelfReflection(registry)
+#     self_reflection.log_performance("text_analysis", "Completed successfully", 0.5)
+#     print(self_reflection.analyze_performance())
+#     print(self_reflection.suggest_improvements())
+# except SelfReflectionError as e:
+#     log_error(f"An error occurred in the Self-Reflection module: {str(e)}")
