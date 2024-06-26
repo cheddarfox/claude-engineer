@@ -6,6 +6,7 @@ It allows for adding, retrieving, listing, and removing capabilities dynamically
 """
 
 from error_handling import CapabilityError, log_info, log_error
+from data_persistence import save_performance_data, load_performance_data
 
 class CapabilityRegistry:
     """
@@ -16,9 +17,34 @@ class CapabilityRegistry:
     """
 
     def __init__(self):
-        """Initialize an empty capability registry."""
-        self.capabilities = {}
+        """Initialize the capability registry and load existing capabilities."""
+        self.capabilities = self._load_capabilities()
         log_info("Capability Registry initialized")
+
+    def _load_capabilities(self):
+        """Load capabilities from persistent storage."""
+        stored_data = load_performance_data()
+        capabilities = {}
+        for entry in stored_data:
+            if entry.get("type") == "capability":
+                name = entry["name"]
+                capabilities[name] = {
+                    "description": entry["description"],
+                    "function": None  # Note: We can't store functions, so this needs to be handled separately
+                }
+        return capabilities
+
+    def _save_capabilities(self):
+        """Save capabilities to persistent storage."""
+        data_to_save = [
+            {
+                "type": "capability",
+                "name": name,
+                "description": info["description"]
+            }
+            for name, info in self.capabilities.items()
+        ]
+        save_performance_data(data_to_save)
 
     def add_capability(self, name, description, function):
         """
@@ -49,6 +75,7 @@ class CapabilityRegistry:
             "description": description,
             "function": function
         }
+        self._save_capabilities()
         log_info(f"Added new capability: {name}")
 
     def get_capability(self, name):
@@ -102,6 +129,7 @@ class CapabilityRegistry:
 
         if name in self.capabilities:
             del self.capabilities[name]
+            self._save_capabilities()
             log_info(f"Removed capability: {name}")
             return True
         else:

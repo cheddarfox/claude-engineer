@@ -10,10 +10,18 @@ from .error_handling import (
     log_warning,
     log_error
 )
+from .data_persistence import (
+    save_logs,
+    load_logs,
+    save_performance_data,
+    load_performance_data
+)
+from .ai_core import AICore
 
 __all__ = [
     'CapabilityRegistry',
     'SelfReflection',
+    'AICore',
     'get_timestamp',
     'timestamp_to_datetime',
     'get_time_difference',
@@ -23,5 +31,9 @@ __all__ = [
     'TimeUtilsError',
     'log_info',
     'log_warning',
-    'log_error'
+    'log_error',
+    'save_logs',
+    'load_logs',
+    'save_performance_data',
+    'load_performance_data'
 ]
