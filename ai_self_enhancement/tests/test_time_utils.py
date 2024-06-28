@@ -9,6 +9,12 @@ def test_get_timestamp():
     # Check if the timestamp is in the correct format
     datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
 
+def test_get_timestamp_microsecond_precision():
+    timestamp = get_timestamp(microsecond_precision=True)
+    assert isinstance(timestamp, str)
+    # Check if the timestamp is in the correct format with microseconds
+    datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S.%f")
+
 def test_timestamp_to_datetime():
     timestamp = "2023-04-15 10:30:00"
     dt = timestamp_to_datetime(timestamp)
@@ -19,6 +25,12 @@ def test_timestamp_to_datetime():
     assert dt.hour == 10
     assert dt.minute == 30
     assert dt.second == 0
+
+def test_timestamp_to_datetime_with_microseconds():
+    timestamp = "2023-04-15 10:30:00.123456"
+    dt = timestamp_to_datetime(timestamp)
+    assert isinstance(dt, datetime)
+    assert dt.microsecond == 123456
 
 def test_timestamp_to_datetime_invalid_format():
     with pytest.raises(TimeUtilsError):
@@ -63,3 +75,31 @@ def test_get_timestamp_consistency():
     difference = get_time_difference(timestamp1, timestamp2)
     assert difference >= 0
     assert difference < 1  # Assuming the two calls are less than a second apart
+
+def test_extreme_date_ranges():
+    far_past = "1000-01-01 00:00:00"
+    far_future = "9999-12-31 23:59:59"
+    difference = get_time_difference(far_past, far_future)
+    assert difference > 0
+
+def test_debug_mode_logging(caplog):
+    import logging
+    logging.getLogger().setLevel(logging.DEBUG)
+    get_timestamp(debug_mode=True)
+    assert "Generated timestamp" in caplog.text
+
+def test_timezone_handling():
+    # This test assumes the time_utils module uses UTC
+    # If it doesn't, adjust the test accordingly
+    timestamp = get_timestamp()
+    dt = timestamp_to_datetime(timestamp)
+    assert dt.tzinfo is None or dt.tzinfo.utcoffset(dt) == timedelta(0)
+
+def test_microsecond_precision_difference():
+    start = "2023-04-15 10:00:00.000000"
+    end = "2023-04-15 10:00:00.000001"
+    difference = get_time_difference(start, end)
+    assert difference == pytest.approx(0.000001)
+
+if __name__ == "__main__":
+    pytest.main([__file__])

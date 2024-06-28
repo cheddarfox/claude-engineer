@@ -5,8 +5,11 @@ This module provides a registry for managing AI system capabilities.
 It allows for adding, retrieving, listing, and removing capabilities dynamically.
 """
 
-from error_handling import CapabilityError, log_info, log_error
+import os
+from typing import Dict, Any, Callable
+from error_handling import CapabilityError, log_info, log_error, log_debug
 from data_persistence import save_performance_data, load_performance_data
+from capability_loader import CapabilityLoader
 
 class CapabilityRegistry:
     """
@@ -16,23 +19,32 @@ class CapabilityRegistry:
     enabling the AI system to evolve and adapt its functionalities over time.
     """
 
-    def __init__(self):
-        """Initialize the capability registry and load existing capabilities."""
-        self.capabilities = self._load_capabilities()
+    def __init__(self, capability_dir: str, debug_mode: bool = False):
+        """
+        Initialize the capability registry and load existing capabilities.
+
+        Args:
+            capability_dir (str): The directory containing capability modules.
+            debug_mode (bool): If True, enables verbose debug logging.
+        """
+        self.debug_mode = debug_mode
+        self.capability_loader = CapabilityLoader(capability_dir, debug_mode)
+        self.capabilities: Dict[str, Dict[str, Any]] = {}
+        self._load_capabilities()
         log_info("Capability Registry initialized")
+        if self.debug_mode:
+            log_debug(f"Loaded {len(self.capabilities)} capabilities")
 
     def _load_capabilities(self):
-        """Load capabilities from persistent storage."""
+        """Load capabilities from persistent storage and capability loader."""
         stored_data = load_performance_data()
-        capabilities = {}
         for entry in stored_data:
             if entry.get("type") == "capability":
                 name = entry["name"]
-                capabilities[name] = {
+                self.capabilities[name] = {
                     "description": entry["description"],
-                    "function": None  # Note: We can't store functions, so this needs to be handled separately
+                    "function": self.capability_loader.get_capability(name)
                 }
-        return capabilities
 
     def _save_capabilities(self):
         """Save capabilities to persistent storage."""
@@ -46,39 +58,43 @@ class CapabilityRegistry:
         ]
         save_performance_data(data_to_save)
 
-    def add_capability(self, name, description, function):
+    def add_capability(self, name: str, description: str):
         """
         Add a new capability to the registry.
 
         Args:
             name (str): The name of the capability.
             description (str): A brief description of what the capability does.
-            function (callable): The function that implements the capability.
-
-        Returns:
-            None
 
         Raises:
             CapabilityError: If the capability name already exists or if invalid input is provided.
         """
-        if not isinstance(name, str) or not name.strip():
-            raise CapabilityError("Capability name must be a non-empty string")
-        if not isinstance(description, str):
-            raise CapabilityError("Capability description must be a string")
-        if not callable(function):
-            raise CapabilityError("Capability function must be callable")
+        try:
+            if not isinstance(name, str) or not name.strip():
+                raise CapabilityError("Capability name must be a non-empty string")
+            if not isinstance(description, str):
+                raise CapabilityError("Capability description must be a string")
 
-        if name in self.capabilities:
-            raise CapabilityError(f"Capability '{name}' already exists")
+            if name in self.capabilities:
+                raise CapabilityError(f"Capability '{name}' already exists")
 
-        self.capabilities[name] = {
-            "description": description,
-            "function": function
-        }
-        self._save_capabilities()
-        log_info(f"Added new capability: {name}")
+            function = self.capability_loader.get_capability(name)
+            if not function:
+                raise CapabilityError(f"Capability function '{name}' not found in loader")
 
-    def get_capability(self, name):
+            self.capabilities[name] = {
+                "description": description,
+                "function": function
+            }
+            self._save_capabilities()
+            log_info(f"Added new capability: {name}")
+            if self.debug_mode:
+                log_debug(f"Capability details - Name: {name}, Description: {description}")
+        except Exception as e:
+            log_error(f"Error adding capability '{name}': {str(e)}")
+            raise CapabilityError(f"Failed to add capability '{name}'") from e
+
+    def get_capability(self, name: str) -> Dict[str, Any]:
         """
         Retrieve a capability from the registry.
 
@@ -86,32 +102,40 @@ class CapabilityRegistry:
             name (str): The name of the capability to retrieve.
 
         Returns:
-            dict or None: A dictionary containing the capability's description and function,
-                          or None if the capability is not found.
+            Dict[str, Any]: A dictionary containing the capability's description and function.
 
         Raises:
-            CapabilityError: If the provided name is not a string.
+            CapabilityError: If the capability is not found or if the provided name is not a string.
         """
-        if not isinstance(name, str):
-            raise CapabilityError("Capability name must be a string")
+        try:
+            if not isinstance(name, str):
+                raise CapabilityError("Capability name must be a string")
 
-        capability = self.capabilities.get(name)
-        if capability is None:
-            log_info(f"Attempted to retrieve non-existent capability: {name}")
-        return capability
+            capability = self.capabilities.get(name)
+            if capability is None:
+                raise CapabilityError(f"Capability '{name}' not found")
 
-    def list_capabilities(self):
+            if self.debug_mode:
+                log_debug(f"Retrieved capability: {name}")
+            return capability
+        except Exception as e:
+            log_error(f"Error retrieving capability '{name}': {str(e)}")
+            raise CapabilityError(f"Failed to retrieve capability '{name}'") from e
+
+    def list_capabilities(self) -> Dict[str, str]:
         """
         List all capabilities currently in the registry.
 
         Returns:
-            list: A list of names of all registered capabilities.
+            Dict[str, str]: A dictionary of capability names and their descriptions.
         """
-        capabilities = list(self.capabilities.keys())
-        log_info(f"Listed {len(capabilities)} capabilities")
-        return capabilities
+        capability_list = {name: info["description"] for name, info in self.capabilities.items()}
+        log_info(f"Listed {len(capability_list)} capabilities")
+        if self.debug_mode:
+            log_debug(f"Capability list: {list(capability_list.keys())}")
+        return capability_list
 
-    def remove_capability(self, name):
+    def remove_capability(self, name: str) -> bool:
         """
         Remove a capability from the registry.
 
@@ -124,26 +148,74 @@ class CapabilityRegistry:
         Raises:
             CapabilityError: If the provided name is not a string.
         """
-        if not isinstance(name, str):
-            raise CapabilityError("Capability name must be a string")
+        try:
+            if not isinstance(name, str):
+                raise CapabilityError("Capability name must be a string")
 
-        if name in self.capabilities:
-            del self.capabilities[name]
-            self._save_capabilities()
-            log_info(f"Removed capability: {name}")
-            return True
-        else:
-            log_info(f"Attempted to remove non-existent capability: {name}")
-            return False
+            if name in self.capabilities:
+                del self.capabilities[name]
+                self._save_capabilities()
+                log_info(f"Removed capability: {name}")
+                if self.debug_mode:
+                    log_debug(f"Capability '{name}' removed from registry")
+                return True
+            else:
+                log_info(f"Attempted to remove non-existent capability: {name}")
+                return False
+        except Exception as e:
+            log_error(f"Error removing capability '{name}': {str(e)}")
+            raise CapabilityError(f"Failed to remove capability '{name}'") from e
 
-# Example usage:
-# try:
-#     registry = CapabilityRegistry()
-#     registry.add_capability("text_analysis", "Analyzes text for sentiment and key phrases", text_analysis_function)
-#     print(registry.list_capabilities())
-#     capability = registry.get_capability("text_analysis")
-#     if capability:
-#         result = capability["function"]("Sample text")
-#         print(result)
-# except CapabilityError as e:
-#     log_error(f"An error occurred in the Capability Registry: {str(e)}")
+    def execute_capability(self, name: str, *args: Any, **kwargs: Any) -> Any:
+        """
+        Execute a capability function by name.
+
+        Args:
+            name (str): The name of the capability to execute.
+            *args: Positional arguments to pass to the capability function.
+            **kwargs: Keyword arguments to pass to the capability function.
+
+        Returns:
+            Any: The result of the capability function execution.
+
+        Raises:
+            CapabilityError: If the capability is not found or execution fails.
+        """
+        try:
+            capability = self.get_capability(name)
+            result = capability["function"](*args, **kwargs)
+            if self.debug_mode:
+                log_debug(f"Executed capability: {name}")
+            return result
+        except Exception as e:
+            log_error(f"Error executing capability '{name}': {str(e)}")
+            raise CapabilityError(f"Failed to execute capability '{name}'") from e
+
+if __name__ == "__main__":
+    # Example usage and testing
+    capability_dir = os.path.join(os.path.dirname(__file__), "capabilities")
+    registry = CapabilityRegistry(capability_dir, debug_mode=True)
+    
+    # List all capabilities
+    print("Available capabilities:", registry.list_capabilities())
+    
+    # Add a new capability
+    try:
+        registry.add_capability("basic_capabilities.greet", "A simple greeting function")
+        print("Added new capability")
+    except CapabilityError as e:
+        print(f"Error adding capability: {e}")
+    
+    # Execute a capability
+    try:
+        result = registry.execute_capability("basic_capabilities.greet", name="AI")
+        print("Execution result:", result)
+    except CapabilityError as e:
+        print(f"Error executing capability: {e}")
+
+    # Remove a capability
+    removed = registry.remove_capability("basic_capabilities.greet")
+    print("Capability removed:", removed)
+
+    # List capabilities again
+    print("Updated capabilities:", registry.list_capabilities())
