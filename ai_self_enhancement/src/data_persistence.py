@@ -9,18 +9,22 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-from error_handling import log_info, log_error, log_debug
+
+from error_handling import log_info, log_error, log_debug, DataPersistenceError
 
 # Define the directory where data will be stored
 DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data')
 DATA_VERSION = "1.0"  # Current version of the data structure
 
-def ensure_data_directory(debug_mode: bool = False):
+def ensure_data_directory(debug_mode: bool = False) -> None:
     """
     Ensure that the data directory exists.
 
     Args:
-        debug_mode (bool): If True, enables verbose debug logging.
+        debug_mode: If True, enables verbose debug logging.
+
+    Raises:
+        DataPersistenceError: If unable to create or access the data directory.
     """
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -28,15 +32,30 @@ def ensure_data_directory(debug_mode: bool = False):
             log_debug(f"Data directory ensured: {DATA_DIR}")
     except Exception as e:
         log_error(f"Error ensuring data directory: {str(e)}")
-        raise
+        raise DataPersistenceError(f"Unable to create or access data directory: {str(e)}")
 
-def save_logs(logs: List[Dict[str, Any]], debug_mode: bool = False):
+def is_compatible_version(data: Dict[str, Any]) -> bool:
+    """
+    Check if the data file version is compatible with the current version.
+
+    Args:
+        data: The loaded data to check.
+
+    Returns:
+        True if the version is compatible, False otherwise.
+    """
+    return data.get("version") == DATA_VERSION
+
+def save_logs(logs: List[Dict[str, Any]], debug_mode: bool = False) -> None:
     """
     Save logs to a JSON file.
 
     Args:
-        logs (List[Dict[str, Any]]): List of log entries to save.
-        debug_mode (bool): If True, enables verbose debug logging.
+        logs: List of log entries to save.
+        debug_mode: If True, enables verbose debug logging.
+
+    Raises:
+        DataPersistenceError: If unable to save the logs.
     """
     try:
         ensure_data_directory(debug_mode)
@@ -56,17 +75,20 @@ def save_logs(logs: List[Dict[str, Any]], debug_mode: bool = False):
             log_debug(f"Saved {len(logs)} log entries")
     except Exception as e:
         log_error(f"Error saving logs: {str(e)}")
-        raise
+        raise DataPersistenceError(f"Unable to save logs: {str(e)}")
 
 def load_logs(debug_mode: bool = False) -> List[Dict[str, Any]]:
     """
     Load all logs from JSON files in the data directory.
 
     Args:
-        debug_mode (bool): If True, enables verbose debug logging.
+        debug_mode: If True, enables verbose debug logging.
 
     Returns:
-        List[Dict[str, Any]]: List of all log entries.
+        List of all log entries.
+
+    Raises:
+        DataPersistenceError: If unable to load the logs.
     """
     try:
         ensure_data_directory(debug_mode)
@@ -77,7 +99,7 @@ def load_logs(debug_mode: bool = False) -> List[Dict[str, Any]]:
                 filepath = os.path.join(DATA_DIR, filename)
                 with open(filepath, 'r') as f:
                     data = json.load(f)
-                    if data.get("version") == DATA_VERSION:
+                    if is_compatible_version(data):
                         logs.extend(data.get("logs", []))
                     else:
                         log_info(f"Skipping file with incompatible version: {filepath}")
@@ -88,15 +110,18 @@ def load_logs(debug_mode: bool = False) -> List[Dict[str, Any]]:
         return logs
     except Exception as e:
         log_error(f"Error loading logs: {str(e)}")
-        raise
+        raise DataPersistenceError(f"Unable to load logs: {str(e)}")
 
-def save_performance_data(performance_data: Dict[str, Any], debug_mode: bool = False):
+def save_performance_data(performance_data: Dict[str, Any], debug_mode: bool = False) -> None:
     """
     Save performance data to a JSON file.
 
     Args:
-        performance_data (Dict[str, Any]): Performance data to save.
-        debug_mode (bool): If True, enables verbose debug logging.
+        performance_data: Performance data to save.
+        debug_mode: If True, enables verbose debug logging.
+
+    Raises:
+        DataPersistenceError: If unable to save the performance data.
     """
     try:
         ensure_data_directory(debug_mode)
@@ -116,17 +141,20 @@ def save_performance_data(performance_data: Dict[str, Any], debug_mode: bool = F
             log_debug(f"Saved performance data: {list(performance_data.keys())}")
     except Exception as e:
         log_error(f"Error saving performance data: {str(e)}")
-        raise
+        raise DataPersistenceError(f"Unable to save performance data: {str(e)}")
 
 def load_performance_data(debug_mode: bool = False) -> List[Dict[str, Any]]:
     """
     Load all performance data from JSON files in the data directory.
 
     Args:
-        debug_mode (bool): If True, enables verbose debug logging.
+        debug_mode: If True, enables verbose debug logging.
 
     Returns:
-        List[Dict[str, Any]]: List of all performance data entries.
+        List of all performance data entries.
+
+    Raises:
+        DataPersistenceError: If unable to load the performance data.
     """
     try:
         ensure_data_directory(debug_mode)
@@ -137,7 +165,7 @@ def load_performance_data(debug_mode: bool = False) -> List[Dict[str, Any]]:
                 filepath = os.path.join(DATA_DIR, filename)
                 with open(filepath, 'r') as f:
                     data = json.load(f)
-                    if data.get("version") == DATA_VERSION:
+                    if is_compatible_version(data):
                         performance_data.append(data.get("performance_data", {}))
                     else:
                         log_info(f"Skipping file with incompatible version: {filepath}")
@@ -148,15 +176,40 @@ def load_performance_data(debug_mode: bool = False) -> List[Dict[str, Any]]:
         return performance_data
     except Exception as e:
         log_error(f"Error loading performance data: {str(e)}")
-        raise
+        raise DataPersistenceError(f"Unable to load performance data: {str(e)}")
 
-def clean_old_data(days_to_keep: int = 30, debug_mode: bool = False):
+def get_latest_performance_data(debug_mode: bool = False) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve the latest performance data entry.
+
+    Args:
+        debug_mode: If True, enables verbose debug logging.
+
+    Returns:
+        The latest performance data entry, or None if no data is available.
+
+    Raises:
+        DataPersistenceError: If unable to retrieve the latest performance data.
+    """
+    try:
+        performance_data = load_performance_data(debug_mode)
+        if performance_data:
+            return performance_data[-1]
+        return None
+    except Exception as e:
+        log_error(f"Error retrieving latest performance data: {str(e)}")
+        raise DataPersistenceError(f"Unable to retrieve latest performance data: {str(e)}")
+
+def clean_old_data(days_to_keep: int = 30, debug_mode: bool = False) -> None:
     """
     Clean up old data files to prevent excessive storage usage.
 
     Args:
-        days_to_keep (int): Number of days of data to keep. Default is 30.
-        debug_mode (bool): If True, enables verbose debug logging.
+        days_to_keep: Number of days of data to keep. Default is 30.
+        debug_mode: If True, enables verbose debug logging.
+
+    Raises:
+        DataPersistenceError: If unable to clean old data.
     """
     try:
         ensure_data_directory(debug_mode)
@@ -176,23 +229,30 @@ def clean_old_data(days_to_keep: int = 30, debug_mode: bool = False):
             log_debug(f"Data cleanup completed. Removed {files_removed} files older than {days_to_keep} days")
     except Exception as e:
         log_error(f"Error cleaning old data: {str(e)}")
-        raise
+        raise DataPersistenceError(f"Unable to clean old data: {str(e)}")
 
 if __name__ == "__main__":
     # Example usage and testing
     debug_mode = True
     
-    # Test saving and loading logs
-    test_logs = [{"timestamp": datetime.now().isoformat(), "message": "Test log entry"}]
-    save_logs(test_logs, debug_mode)
-    loaded_logs = load_logs(debug_mode)
-    print(f"Loaded logs: {loaded_logs}")
-    
-    # Test saving and loading performance data
-    test_performance = {"metric1": 0.95, "metric2": 0.87}
-    save_performance_data(test_performance, debug_mode)
-    loaded_performance = load_performance_data(debug_mode)
-    print(f"Loaded performance data: {loaded_performance}")
-    
-    # Test data cleanup
-    clean_old_data(days_to_keep=7, debug_mode=debug_mode)
+    try:
+        # Test saving and loading logs
+        test_logs = [{"timestamp": datetime.now().isoformat(), "message": "Test log entry"}]
+        save_logs(test_logs, debug_mode)
+        loaded_logs = load_logs(debug_mode)
+        print(f"Loaded logs: {loaded_logs}")
+        
+        # Test saving and loading performance data
+        test_performance = {"metric1": 0.95, "metric2": 0.87}
+        save_performance_data(test_performance, debug_mode)
+        loaded_performance = load_performance_data(debug_mode)
+        print(f"Loaded performance data: {loaded_performance}")
+        
+        # Test getting latest performance data
+        latest_performance = get_latest_performance_data(debug_mode)
+        print(f"Latest performance data: {latest_performance}")
+        
+        # Test data cleanup
+        clean_old_data(days_to_keep=7, debug_mode=debug_mode)
+    except DataPersistenceError as e:
+        print(f"Data persistence error occurred: {e}")

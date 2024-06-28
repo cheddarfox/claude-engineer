@@ -8,31 +8,34 @@ without modifying core components.
 
 import os
 import importlib.util
-from typing import Dict, Callable, Any
+from typing import Dict, Callable, Any, Optional
+
 from error_handling import log_info, log_error, log_debug
 
-class CapabilityLoader:
-    """
-    A class to dynamically load and manage capability functions.
-    """
 
-    def __init__(self, capability_dir: str, debug_mode: bool = False):
+class CapabilityError(Exception):
+    """Custom exception class for capability-related errors."""
+    pass
+
+
+class CapabilityLoader:
+    """A class to dynamically load and manage capability functions."""
+
+    def __init__(self, capability_dir: str, debug_mode: bool = False) -> None:
         """
         Initialize the CapabilityLoader.
 
         Args:
-            capability_dir (str): The directory containing capability modules.
-            debug_mode (bool): If True, enables verbose debug logging.
+            capability_dir: The directory containing capability modules.
+            debug_mode: If True, enables verbose debug logging.
         """
         self.capability_dir = capability_dir
         self.debug_mode = debug_mode
         self.capabilities: Dict[str, Callable] = {}
         self.load_capabilities()
 
-    def load_capabilities(self):
-        """
-        Scan the capability directory and load all capability functions.
-        """
+    def load_capabilities(self) -> None:
+        """Scan the capability directory and load all capability functions."""
         try:
             for filename in os.listdir(self.capability_dir):
                 if filename.endswith(".py") and not filename.startswith("__"):
@@ -45,14 +48,15 @@ class CapabilityLoader:
                 log_debug(f"Loaded capabilities: {list(self.capabilities.keys())}")
         except Exception as e:
             log_error(f"Error loading capabilities: {str(e)}")
+            raise CapabilityError("Failed to load capabilities") from e
 
-    def load_capability_module(self, module_name: str, module_path: str):
+    def load_capability_module(self, module_name: str, module_path: str) -> None:
         """
         Load a single capability module and its functions.
 
         Args:
-            module_name (str): The name of the module to load.
-            module_path (str): The file path of the module to load.
+            module_name: The name of the module to load.
+            module_path: The file path of the module to load.
         """
         try:
             spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -69,38 +73,41 @@ class CapabilityLoader:
                 log_debug(f"Loaded module: {module_name}")
         except Exception as e:
             log_error(f"Error loading module {module_name}: {str(e)}")
+            raise CapabilityError(f"Failed to load module {module_name}") from e
 
     def get_capability(self, capability_name: str) -> Callable:
         """
         Retrieve a capability function by name.
 
         Args:
-            capability_name (str): The name of the capability to retrieve.
+            capability_name: The name of the capability to retrieve.
 
         Returns:
-            Callable: The capability function.
+            The capability function.
 
         Raises:
-            KeyError: If the capability is not found.
+            CapabilityError: If the capability is not found.
         """
-        if capability_name not in self.capabilities:
-            raise KeyError(f"Capability '{capability_name}' not found")
-        return self.capabilities[capability_name]
+        try:
+            return self.capabilities[capability_name]
+        except KeyError:
+            log_error(f"Capability '{capability_name}' not found")
+            raise CapabilityError(f"Capability '{capability_name}' not found")
 
     def execute_capability(self, capability_name: str, *args: Any, **kwargs: Any) -> Any:
         """
         Execute a capability function by name.
 
         Args:
-            capability_name (str): The name of the capability to execute.
+            capability_name: The name of the capability to execute.
             *args: Positional arguments to pass to the capability function.
             **kwargs: Keyword arguments to pass to the capability function.
 
         Returns:
-            Any: The result of the capability function execution.
+            The result of the capability function execution.
 
         Raises:
-            KeyError: If the capability is not found.
+            CapabilityError: If the capability is not found or execution fails.
         """
         try:
             capability = self.get_capability(capability_name)
@@ -108,9 +115,12 @@ class CapabilityLoader:
             if self.debug_mode:
                 log_debug(f"Executed capability: {capability_name}")
             return result
+        except CapabilityError:
+            raise
         except Exception as e:
             log_error(f"Error executing capability '{capability_name}': {str(e)}")
-            raise
+            raise CapabilityError(f"Failed to execute capability '{capability_name}'") from e
+
 
 if __name__ == "__main__":
     # Example usage and testing
@@ -124,5 +134,5 @@ if __name__ == "__main__":
     try:
         result = loader.execute_capability("test_capability.hello", name="AI")
         print("Execution result:", result)
-    except KeyError:
-        print("Test capability not found. Please ensure a test capability module is present in the capabilities directory.")
+    except CapabilityError as e:
+        print(f"Capability error: {e}")

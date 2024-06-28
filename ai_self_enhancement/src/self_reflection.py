@@ -5,21 +5,25 @@ This module provides advanced functionality for the AI system to reflect on its 
 analyze its capabilities, and suggest potential improvements using advanced analytics.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from datetime import datetime
+
 from error_handling import log_info, log_error, log_debug, SelfReflectionError
 from data_persistence import save_logs, load_logs, save_performance_data, load_performance_data
 from advanced_analytics import AdvancedAnalytics
 from time_utils import get_timestamp, timestamp_to_datetime
 
+
 class SelfReflection:
-    def __init__(self, capability_registry, debug_mode: bool = False):
+    """Class for managing AI system's self-reflection and performance analysis."""
+
+    def __init__(self, capability_registry: Any, debug_mode: bool = False) -> None:
         """
         Initialize the SelfReflection instance.
 
         Args:
             capability_registry: The system's capability registry.
-            debug_mode (bool): If True, enables verbose debug logging.
+            debug_mode: If True, enables verbose debug logging.
         """
         self.capability_registry = capability_registry
         self.debug_mode = debug_mode
@@ -29,15 +33,16 @@ class SelfReflection:
         if self.debug_mode:
             log_debug(f"Loaded {len(self.performance_log)} existing log entries")
 
-    def log_performance(self, task: str, result: Any, execution_time: float, category: str = None):
+    def log_performance(self, task: str, result: Any, execution_time: float,
+                        category: str = None) -> None:
         """
         Log the performance of a completed task and save it to persistent storage.
 
         Args:
-            task (str): The name of the task performed.
+            task: The name of the task performed.
             result: The result of the task execution.
-            execution_time (float): The time taken to execute the task, in seconds.
-            category (str, optional): The category of the task.
+            execution_time: The time taken to execute the task, in seconds.
+            category: The category of the task.
 
         Raises:
             SelfReflectionError: If input parameters are invalid.
@@ -71,7 +76,7 @@ class SelfReflection:
         Perform a comprehensive analysis of the system's performance using advanced analytics.
 
         Returns:
-            Dict[str, Any]: A dictionary containing various performance metrics and analyses.
+            A dictionary containing various performance metrics and analyses.
 
         Raises:
             SelfReflectionError: If an error occurs during analysis.
@@ -109,7 +114,15 @@ class SelfReflection:
             raise SelfReflectionError("Failed to complete performance analysis") from e
 
     def _analyze_task_categories(self, logs: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-        """Analyze performance by task categories."""
+        """
+        Analyze performance by task categories.
+
+        Args:
+            logs: List of performance log entries.
+
+        Returns:
+            A dictionary of task categories and their performance summaries.
+        """
         categories = {}
         for log in logs:
             category = log.get("category", "uncategorized")
@@ -126,7 +139,15 @@ class SelfReflection:
         return category_analysis
 
     def _analyze_capability_usage(self, logs: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-        """Analyze the usage and performance of different capabilities."""
+        """
+        Analyze the usage and performance of different capabilities.
+
+        Args:
+            logs: List of performance log entries.
+
+        Returns:
+            A dictionary of capabilities and their usage statistics.
+        """
         capabilities = self.capability_registry.list_capabilities()
         capability_usage = {cap: [] for cap in capabilities}
 
@@ -149,7 +170,15 @@ class SelfReflection:
         return capability_analysis
 
     def _identify_areas_for_improvement(self, logs: List[Dict[str, Any]]) -> List[str]:
-        """Identify specific areas for improvement based on performance data."""
+        """
+        Identify specific areas for improvement based on performance data.
+
+        Args:
+            logs: List of performance log entries.
+
+        Returns:
+            A list of improvement suggestions.
+        """
         improvements = []
 
         # Analyze slow tasks
@@ -161,14 +190,18 @@ class SelfReflection:
 
         # Analyze capability reliability
         capability_analysis = self._analyze_capability_usage(logs)
-        low_reliability_caps = [cap for cap, analysis in capability_analysis.items() 
-                                if analysis.get("usage_count", 0) > 5 and analysis.get("mean", 0) > 2 * self.advanced_analytics.performance_summary(execution_times)["mean"]]
+        overall_mean = self.advanced_analytics.performance_summary(execution_times)["mean"]
+        low_reliability_caps = [
+            cap for cap, analysis in capability_analysis.items()
+            if analysis.get("usage_count", 0) > 5 and analysis.get("mean", 0) > 2 * overall_mean
+        ]
         if low_reliability_caps:
             improvements.append(f"Improve reliability of capabilities: {', '.join(low_reliability_caps)}")
 
         # Suggest new capabilities
         all_capabilities = set(self.capability_registry.list_capabilities())
-        missing_capabilities = set(["natural_language_processing", "image_recognition", "speech_recognition", "machine_learning"]) - all_capabilities
+        missing_capabilities = {"natural_language_processing", "image_recognition",
+                                "speech_recognition", "machine_learning"} - all_capabilities
         if missing_capabilities:
             improvements.append(f"Consider adding new capabilities: {', '.join(missing_capabilities)}")
 
@@ -181,7 +214,7 @@ class SelfReflection:
         Generate a comprehensive performance report.
 
         Returns:
-            str: A formatted string containing the performance report.
+            A formatted string containing the performance report.
 
         Raises:
             SelfReflectionError: If an error occurs during report generation.
@@ -191,57 +224,59 @@ class SelfReflection:
             if "message" in analysis:
                 return analysis["message"]
 
-            report = f"Performance Report (as of {analysis['timestamp']}):\n\n"
+            report = [f"Performance Report (as of {analysis['timestamp']}):\n"]
             
-            report += "1. Overall Statistics:\n"
+            report.append("1. Overall Statistics:")
             summary = analysis['performance_summary']
-            report += f"   - Total tasks completed: {analysis['total_tasks']}\n"
-            report += f"   - Average execution time: {summary['mean']:.2f} seconds\n"
-            report += f"   - Median execution time: {summary['median']:.2f} seconds\n"
-            report += f"   - Standard deviation: {summary['std_dev']:.2f} seconds\n"
-            report += f"   - Min execution time: {summary['min']:.2f} seconds\n"
-            report += f"   - Max execution time: {summary['max']:.2f} seconds\n\n"
+            report.append(f"   - Total tasks completed: {analysis['total_tasks']}")
+            report.append(f"   - Average execution time: {summary['mean']:.2f} seconds")
+            report.append(f"   - Median execution time: {summary['median']:.2f} seconds")
+            report.append(f"   - Standard deviation: {summary['std_dev']:.2f} seconds")
+            report.append(f"   - Min execution time: {summary['min']:.2f} seconds")
+            report.append(f"   - Max execution time: {summary['max']:.2f} seconds\n")
 
-            report += "2. Performance Trend:\n"
+            report.append("2. Performance Trend:")
             trend = analysis['trend_analysis']
-            report += f"   - Trend direction: {trend['trend_direction']}\n"
-            report += f"   - Trend strength: {trend['trend_strength']:.2f}\n"
-            report += f"   - Slope: {trend['slope']:.4f}\n\n"
+            report.append(f"   - Trend direction: {trend['trend_direction']}")
+            report.append(f"   - Trend strength: {trend['trend_strength']:.2f}")
+            report.append(f"   - Slope: {trend['slope']:.4f}\n")
 
-            report += "3. Anomalies:\n"
+            report.append("3. Anomalies:")
             anomalies = analysis['anomalies']
             anomaly_count = sum(anomalies)
-            report += f"   - Number of anomalies detected: {anomaly_count}\n\n"
+            report.append(f"   - Number of anomalies detected: {anomaly_count}\n")
 
-            report += "4. Performance Forecast:\n"
+            report.append("4. Performance Forecast:")
             forecast = analysis['forecast']
             for i, value in enumerate(forecast):
-                report += f"   - Step {i+1}: {value:.2f} seconds\n"
-            report += "\n"
+                report.append(f"   - Step {i+1}: {value:.2f} seconds")
+            report.append("")
 
-            report += "5. Task Categories:\n"
+            report.append("5. Task Categories:")
             for category, stats in analysis['task_categories'].items():
-                report += f"   - {category}: {stats['count']} tasks, Avg time {stats['mean']:.2f}s\n"
-            report += "\n"
+                report.append(f"   - {category}: {stats['count']} tasks, Avg time {stats['mean']:.2f}s")
+            report.append("")
 
-            report += "6. Capability Usage:\n"
+            report.append("6. Capability Usage:")
             for capability, usage in analysis['capability_usage'].items():
                 if usage['usage_count'] > 0:
-                    report += f"   - {capability}: Used {usage['usage_count']} times, Avg time {usage['mean']:.2f}s\n"
-            report += "\n"
+                    report.append(f"   - {capability}: Used {usage['usage_count']} times, "
+                                  f"Avg time {usage['mean']:.2f}s")
+            report.append("")
 
-            report += "7. Areas for Improvement:\n"
+            report.append("7. Areas for Improvement:")
             for improvement in analysis['areas_for_improvement']:
-                report += f"   - {improvement}\n"
+                report.append(f"   - {improvement}")
 
             if self.debug_mode:
                 log_debug("Performance report generated successfully")
-            return report
+            return "\n".join(report)
         except Exception as e:
             log_error(f"Error generating performance report: {str(e)}")
             if self.debug_mode:
                 log_debug(f"Detailed error in generate_report: {repr(e)}")
             raise SelfReflectionError("Failed to generate performance report") from e
+
 
 if __name__ == "__main__":
     # Example usage
