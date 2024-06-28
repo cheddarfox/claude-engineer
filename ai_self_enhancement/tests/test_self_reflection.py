@@ -11,8 +11,19 @@ def mock_capability_registry():
     return registry
 
 @pytest.fixture
-def self_reflection(mock_capability_registry):
-    return SelfReflection(mock_capability_registry, debug_mode=True)
+def mock_advanced_analytics():
+    analytics = Mock()
+    analytics.analyze_trend.return_value = {"trend_direction": "increasing", "trend_strength": 0.8}
+    analytics.detect_anomalies.return_value = [False, True, False]
+    analytics.forecast_performance.return_value = [1.1, 1.2, 1.3]
+    analytics.performance_summary.return_value = {"mean": 1.0, "median": 0.9, "std_dev": 0.2}
+    return analytics
+
+@pytest.fixture
+def self_reflection(mock_capability_registry, mock_advanced_analytics):
+    reflection = SelfReflection(mock_capability_registry, debug_mode=True)
+    reflection.advanced_analytics = mock_advanced_analytics
+    return reflection
 
 def test_self_reflection_initialization(self_reflection):
     assert isinstance(self_reflection.performance_log, list)
@@ -52,20 +63,26 @@ def test_analyze_performance_with_data(mock_load_logs, self_reflection):
     analysis = self_reflection.analyze_performance()
     assert "timestamp" in analysis
     assert analysis["total_tasks"] == 3
-    assert analysis["avg_execution_time"] == 2.0
-    assert analysis["success_rate"] == 2/3
+    assert "performance_summary" in analysis
+    assert "trend_analysis" in analysis
+    assert "anomalies" in analysis
+    assert "forecast" in analysis
+    assert "task_categories" in analysis
+    assert "capability_usage" in analysis
+    assert "areas_for_improvement" in analysis
 
-def test_analyze_performance_trend(self_reflection):
-    now = datetime.now()
+def test_advanced_analytics_integration(self_reflection):
     logs = [
-        {"task": "task1", "result": "success", "execution_time": 1.0, "timestamp": now.isoformat()},
-        {"task": "task2", "result": "success", "execution_time": 2.0, "timestamp": (now + timedelta(hours=1)).isoformat()},
-        {"task": "task3", "result": "failure", "execution_time": 3.0, "timestamp": (now + timedelta(hours=2)).isoformat()}
+        {"task": "task1", "result": "success", "execution_time": 1.0, "timestamp": datetime.now().isoformat()},
+        {"task": "task2", "result": "success", "execution_time": 2.0, "timestamp": datetime.now().isoformat()},
+        {"task": "task3", "result": "failure", "execution_time": 3.0, "timestamp": datetime.now().isoformat()}
     ]
-    trend = self_reflection._analyze_performance_trend(logs)
-    assert isinstance(trend, list)
-    assert len(trend) > 0
-    assert all(isinstance(period, dict) for period in trend)
+    analysis = self_reflection.analyze_performance()
+    
+    assert self_reflection.advanced_analytics.analyze_trend.called
+    assert self_reflection.advanced_analytics.detect_anomalies.called
+    assert self_reflection.advanced_analytics.forecast_performance.called
+    assert self_reflection.advanced_analytics.performance_summary.called
 
 def test_analyze_task_categories(self_reflection):
     logs = [
@@ -93,6 +110,8 @@ def test_generate_report(mock_load_logs, self_reflection):
     assert "Performance Report" in report
     assert "Overall Statistics" in report
     assert "Performance Trend" in report
+    assert "Anomalies" in report
+    assert "Performance Forecast" in report
     assert "Task Categories" in report
     assert "Capability Usage" in report
     assert "Areas for Improvement" in report
@@ -109,6 +128,18 @@ def test_identify_areas_for_improvement(self_reflection):
     assert any("slow_task" in improvement for improvement in improvements)
     assert any("capability1" in improvement for improvement in improvements)
     assert any("new capabilities" in improvement for improvement in improvements)
+
+@patch('ai_self_enhancement.src.self_reflection.load_logs')
+def test_error_handling_in_performance_analysis(mock_load_logs, self_reflection):
+    mock_load_logs.side_effect = Exception("Test error")
+    
+    with pytest.raises(SelfReflectionError):
+        self_reflection.analyze_performance()
+
+@patch('ai_self_enhancement.src.self_reflection.log_debug')
+def test_debug_mode(mock_log_debug, self_reflection):
+    self_reflection.log_performance("debug_task", "success", 1.0)
+    assert mock_log_debug.called
 
 if __name__ == "__main__":
     pytest.main([__file__])
