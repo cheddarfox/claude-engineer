@@ -1,295 +1,110 @@
 """
 Self-Reflection Module
 
-This module provides advanced functionality for the AI system to reflect on its own performance,
-analyze its capabilities, and suggest potential improvements using advanced analytics.
+This module provides functionality for the AI system to reflect on its own performance,
+analyze its capabilities, and suggest potential improvements.
 """
 
-from typing import List, Dict, Any, Union
-from datetime import datetime
-
-from error_handling import log_info, log_error, log_debug, SelfReflectionError
-from data_persistence import save_logs, load_logs, save_performance_data, load_performance_data
-from advanced_analytics import AdvancedAnalytics
-from time_utils import get_timestamp, timestamp_to_datetime
-
+from typing import List, Dict, Any
+from time_utils import get_timestamp
 
 class SelfReflection:
-    """Class for managing AI system's self-reflection and performance analysis."""
-
-    def __init__(self, capability_registry: Any, debug_mode: bool = False) -> None:
-        """
-        Initialize the SelfReflection instance.
-
-        Args:
-            capability_registry: The system's capability registry.
-            debug_mode: If True, enables verbose debug logging.
-        """
+    def __init__(self, capability_registry):
         self.capability_registry = capability_registry
-        self.debug_mode = debug_mode
-        self.advanced_analytics = AdvancedAnalytics(debug_mode)
-        self.performance_log = load_logs()
-        log_info("SelfReflection instance initialized")
-        if self.debug_mode:
-            log_debug(f"Loaded {len(self.performance_log)} existing log entries")
+        self.performance_logs = []
+        self.project_management_logs = []
 
-    def log_performance(self, task: str, result: Any, execution_time: float,
-                        category: str = None) -> None:
-        """
-        Log the performance of a completed task and save it to persistent storage.
+    def log_performance(self, task_name: str, result: Any, execution_time: float):
+        """Log the performance of a completed task."""
+        log_entry = {
+            "timestamp": get_timestamp(),
+            "task_name": task_name,
+            "result": result,
+            "execution_time": execution_time
+        }
+        self.performance_logs.append(log_entry)
 
-        Args:
-            task: The name of the task performed.
-            result: The result of the task execution.
-            execution_time: The time taken to execute the task, in seconds.
-            category: The category of the task.
-
-        Raises:
-            SelfReflectionError: If input parameters are invalid.
-        """
-        try:
-            if not isinstance(task, str) or not task.strip():
-                raise SelfReflectionError("Task must be a non-empty string")
-            if not isinstance(execution_time, (int, float)) or execution_time < 0:
-                raise SelfReflectionError("Execution time must be a non-negative number")
-
-            log_entry = {
-                "task": task,
-                "result": result,
-                "execution_time": execution_time,
-                "timestamp": get_timestamp(),
-                "category": category
-            }
-            self.performance_log.append(log_entry)
-            save_logs([log_entry])
-            log_info(f"Performance logged for task: {task}")
-            if self.debug_mode:
-                log_debug(f"Log entry details: {log_entry}")
-        except Exception as e:
-            log_error(f"Error logging performance: {str(e)}")
-            if self.debug_mode:
-                log_debug(f"Detailed error in log_performance: {repr(e)}")
-            raise SelfReflectionError(f"Failed to log performance for task '{task}'") from e
+    def log_project_management_performance(self, project_logs: List[Dict[str, Any]]):
+        """Log the performance of project management activities."""
+        self.project_management_logs.extend(project_logs)
 
     def analyze_performance(self) -> Dict[str, Any]:
-        """
-        Perform a comprehensive analysis of the system's performance using advanced analytics.
+        """Analyze the overall performance of the system."""
+        if not self.performance_logs:
+            return {"message": "No performance data available."}
 
-        Returns:
-            A dictionary containing various performance metrics and analyses.
+        total_tasks = len(self.performance_logs)
+        total_execution_time = sum(log["execution_time"] for log in self.performance_logs)
+        avg_execution_time = total_execution_time / total_tasks
 
-        Raises:
-            SelfReflectionError: If an error occurs during analysis.
-        """
-        try:
-            all_logs = load_logs()
-            if not all_logs:
-                log_info("Performance analysis attempted with no data")
-                return {"message": "No performance data available."}
+        return {
+            "total_tasks": total_tasks,
+            "total_execution_time": total_execution_time,
+            "average_execution_time": avg_execution_time
+        }
 
-            execution_times = [log["execution_time"] for log in all_logs]
-            timestamps = [timestamp_to_datetime(log["timestamp"]) for log in all_logs]
+    def analyze_project_management_performance(self) -> Dict[str, Any]:
+        """Analyze the performance of project management activities."""
+        if not self.project_management_logs:
+            return {"message": "No project management data available."}
 
-            analysis = {
-                "timestamp": get_timestamp(),
-                "total_tasks": len(all_logs),
-                "performance_summary": self.advanced_analytics.performance_summary(execution_times),
-                "trend_analysis": self.advanced_analytics.analyze_trend(execution_times),
-                "anomalies": self.advanced_analytics.detect_anomalies(execution_times),
-                "forecast": self.advanced_analytics.forecast_performance(execution_times),
-                "task_categories": self._analyze_task_categories(all_logs),
-                "capability_usage": self._analyze_capability_usage(all_logs),
-                "areas_for_improvement": self._identify_areas_for_improvement(all_logs)
-            }
+        total_tasks = len(self.project_management_logs)
+        completed_tasks = sum(1 for log in self.project_management_logs if log.get("action") == "complete_task")
+        
+        priority_distribution = {
+            "High": 0,
+            "Medium": 0,
+            "Low": 0
+        }
+        
+        progress_over_time = []
+        token_usage_over_time = []
+        total_tokens_used = 0
 
-            log_info("Comprehensive performance analysis completed")
-            if self.debug_mode:
-                log_debug(f"Analysis results: {analysis}")
-            save_performance_data(analysis)
-            return analysis
-        except Exception as e:
-            log_error(f"Error during performance analysis: {str(e)}")
-            if self.debug_mode:
-                log_debug(f"Detailed error in analyze_performance: {repr(e)}")
-            raise SelfReflectionError("Failed to complete performance analysis") from e
+        for log in self.project_management_logs:
+            # Update priority distribution
+            priority = log.get("priority", "Medium")
+            priority_distribution[priority] += 1
 
-    def _analyze_task_categories(self, logs: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-        """
-        Analyze performance by task categories.
-
-        Args:
-            logs: List of performance log entries.
-
-        Returns:
-            A dictionary of task categories and their performance summaries.
-        """
-        categories = {}
-        for log in logs:
-            category = log.get("category", "uncategorized")
-            if category not in categories:
-                categories[category] = []
-            categories[category].append(log["execution_time"])
-
-        category_analysis = {}
-        for category, times in categories.items():
-            category_analysis[category] = self.advanced_analytics.performance_summary(times)
-
-        if self.debug_mode:
-            log_debug(f"Task category analysis completed. Categories analyzed: {len(category_analysis)}")
-        return category_analysis
-
-    def _analyze_capability_usage(self, logs: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-        """
-        Analyze the usage and performance of different capabilities.
-
-        Args:
-            logs: List of performance log entries.
-
-        Returns:
-            A dictionary of capabilities and their usage statistics.
-        """
-        capabilities = self.capability_registry.list_capabilities()
-        capability_usage = {cap: [] for cap in capabilities}
-
-        for log in logs:
-            task = log["task"]
-            for capability in capabilities:
-                if capability in task:
-                    capability_usage[capability].append(log["execution_time"])
-
-        capability_analysis = {}
-        for cap, times in capability_usage.items():
-            if times:
-                capability_analysis[cap] = self.advanced_analytics.performance_summary(times)
-                capability_analysis[cap]["usage_count"] = len(times)
-            else:
-                capability_analysis[cap] = {"usage_count": 0}
-
-        if self.debug_mode:
-            log_debug(f"Capability usage analysis completed. Capabilities analyzed: {len(capability_analysis)}")
-        return capability_analysis
-
-    def _identify_areas_for_improvement(self, logs: List[Dict[str, Any]]) -> List[str]:
-        """
-        Identify specific areas for improvement based on performance data.
-
-        Args:
-            logs: List of performance log entries.
-
-        Returns:
-            A list of improvement suggestions.
-        """
-        improvements = []
-
-        # Analyze slow tasks
-        execution_times = [log["execution_time"] for log in logs]
-        anomalies = self.advanced_analytics.detect_anomalies(execution_times)
-        slow_tasks = [log["task"] for log, is_anomaly in zip(logs, anomalies) if is_anomaly]
-        if slow_tasks:
-            improvements.append(f"Optimize performance for tasks: {', '.join(set(slow_tasks[:5]))}")
-
-        # Analyze capability reliability
-        capability_analysis = self._analyze_capability_usage(logs)
-        overall_mean = self.advanced_analytics.performance_summary(execution_times)["mean"]
-        low_reliability_caps = [
-            cap for cap, analysis in capability_analysis.items()
-            if analysis.get("usage_count", 0) > 5 and analysis.get("mean", 0) > 2 * overall_mean
-        ]
-        if low_reliability_caps:
-            improvements.append(f"Improve reliability of capabilities: {', '.join(low_reliability_caps)}")
-
-        # Suggest new capabilities
-        all_capabilities = set(self.capability_registry.list_capabilities())
-        missing_capabilities = {"natural_language_processing", "image_recognition",
-                                "speech_recognition", "machine_learning"} - all_capabilities
-        if missing_capabilities:
-            improvements.append(f"Consider adding new capabilities: {', '.join(missing_capabilities)}")
-
-        if self.debug_mode:
-            log_debug(f"Areas for improvement identified: {len(improvements)}")
-        return improvements
-
-    def generate_report(self) -> str:
-        """
-        Generate a comprehensive performance report.
-
-        Returns:
-            A formatted string containing the performance report.
-
-        Raises:
-            SelfReflectionError: If an error occurs during report generation.
-        """
-        try:
-            analysis = self.analyze_performance()
-            if "message" in analysis:
-                return analysis["message"]
-
-            report = [f"Performance Report (as of {analysis['timestamp']}):\n"]
+            # Update progress and token usage over time
+            progress_over_time.append({
+                "timestamp": log["timestamp"],
+                "progress": completed_tasks / total_tasks * 100
+            })
             
-            report.append("1. Overall Statistics:")
-            summary = analysis['performance_summary']
-            report.append(f"   - Total tasks completed: {analysis['total_tasks']}")
-            report.append(f"   - Average execution time: {summary['mean']:.2f} seconds")
-            report.append(f"   - Median execution time: {summary['median']:.2f} seconds")
-            report.append(f"   - Standard deviation: {summary['std_dev']:.2f} seconds")
-            report.append(f"   - Min execution time: {summary['min']:.2f} seconds")
-            report.append(f"   - Max execution time: {summary['max']:.2f} seconds\n")
+            tokens_used = log.get("tokens_used", 0)
+            total_tokens_used += tokens_used
+            token_usage_over_time.append({
+                "timestamp": log["timestamp"],
+                "tokens": tokens_used
+            })
 
-            report.append("2. Performance Trend:")
-            trend = analysis['trend_analysis']
-            report.append(f"   - Trend direction: {trend['trend_direction']}")
-            report.append(f"   - Trend strength: {trend['trend_strength']:.2f}")
-            report.append(f"   - Slope: {trend['slope']:.4f}\n")
+        return {
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks,
+            "completion_rate": completed_tasks / total_tasks,
+            "priority_distribution": priority_distribution,
+            "progress_over_time": progress_over_time,
+            "token_usage_over_time": token_usage_over_time,
+            "total_tokens_used": total_tokens_used
+        }
 
-            report.append("3. Anomalies:")
-            anomalies = analysis['anomalies']
-            anomaly_count = sum(anomalies)
-            report.append(f"   - Number of anomalies detected: {anomaly_count}\n")
+    def suggest_improvements(self) -> List[str]:
+        """Generate improvement suggestions based on performance analysis."""
+        performance_analysis = self.analyze_performance()
+        project_management_analysis = self.analyze_project_management_performance()
 
-            report.append("4. Performance Forecast:")
-            forecast = analysis['forecast']
-            for i, value in enumerate(forecast):
-                report.append(f"   - Step {i+1}: {value:.2f} seconds")
-            report.append("")
+        suggestions = []
 
-            report.append("5. Task Categories:")
-            for category, stats in analysis['task_categories'].items():
-                report.append(f"   - {category}: {stats['count']} tasks, Avg time {stats['mean']:.2f}s")
-            report.append("")
+        if performance_analysis.get("average_execution_time", 0) > 1.0:
+            suggestions.append("Consider optimizing task execution for better performance.")
 
-            report.append("6. Capability Usage:")
-            for capability, usage in analysis['capability_usage'].items():
-                if usage['usage_count'] > 0:
-                    report.append(f"   - {capability}: Used {usage['usage_count']} times, "
-                                  f"Avg time {usage['mean']:.2f}s")
-            report.append("")
+        if project_management_analysis.get("completion_rate", 0) < 0.8:
+            suggestions.append("Improve task completion rate in project management.")
 
-            report.append("7. Areas for Improvement:")
-            for improvement in analysis['areas_for_improvement']:
-                report.append(f"   - {improvement}")
+        if project_management_analysis.get("total_tokens_used", 0) > 10000:
+            suggestions.append("Look into reducing token usage for more efficient operations.")
 
-            if self.debug_mode:
-                log_debug("Performance report generated successfully")
-            return "\n".join(report)
-        except Exception as e:
-            log_error(f"Error generating performance report: {str(e)}")
-            if self.debug_mode:
-                log_debug(f"Detailed error in generate_report: {repr(e)}")
-            raise SelfReflectionError("Failed to generate performance report") from e
+        return suggestions
 
-
-if __name__ == "__main__":
-    # Example usage
-    from capability_registry import CapabilityRegistry
-    capability_dir = "path/to/capabilities"
-    registry = CapabilityRegistry(capability_dir, debug_mode=True)
-    self_reflection = SelfReflection(registry, debug_mode=True)
-    
-    # Log some sample performance data
-    self_reflection.log_performance("task1", "success", 1.5, "category1")
-    self_reflection.log_performance("task2", "failure", 2.0, "category2")
-    self_reflection.log_performance("task3", "success", 1.0, "category1")
-    
-    # Generate and print a report
-    report = self_reflection.generate_report()
-    print(report)
+# Add any additional methods or classes as needed

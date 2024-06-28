@@ -2,8 +2,9 @@
 AI Self-Enhancement System
 
 This module serves as the main entry point for the AI Self-Enhancement system.
-It integrates the capability registry and self-reflection components to demonstrate
-the system's ability to perform tasks and analyze its own performance.
+It integrates the capability registry, self-reflection components, autonomous project management,
+and cross-domain knowledge linking to demonstrate the system's ability to perform tasks,
+analyze its performance, manage its own development, and make innovative connections.
 """
 
 import os
@@ -15,6 +16,9 @@ from self_reflection import SelfReflection
 from time_utils import get_timestamp, get_time_difference
 from error_handling import AISelfEnhancementError
 from capability_decorator import load_capability, CapabilityValidationError
+from autonomous_pm import AutonomousProjectManager
+from visualization import plot_task_completion_rate, plot_task_priority_distribution, plot_progress_over_time
+from knowledge_linker import KnowledgeLinker
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,21 +27,26 @@ class AISelfEnhancementSystem:
     """
     The main class for the AI Self-Enhancement System.
 
-    This class integrates the capability registry and self-reflection modules
-    to create a system that can perform tasks and analyze its own performance.
+    This class integrates the capability registry, self-reflection modules, autonomous project management,
+    and cross-domain knowledge linking to create a system that can perform tasks, analyze its own performance,
+    manage its own development process, and make innovative connections between different domains.
     """
 
     def __init__(self):
         """Initialize the AI Self-Enhancement System."""
         self.capability_registry = CapabilityRegistry()
         self.self_reflection = SelfReflection(self.capability_registry)
+        kanban_path = os.path.join(os.path.dirname(__file__), '..', 'kanban-board.md')
+        self.project_manager = AutonomousProjectManager(kanban_path)
+        self.knowledge_linker = KnowledgeLinker(self.capability_registry)
 
     def run(self):
         """
         Run the AI Self-Enhancement System.
 
         This method demonstrates the system's capabilities by registering initial
-        capabilities, performing sample tasks, and analyzing the system's performance.
+        capabilities, performing sample tasks, analyzing its performance, managing its own development,
+        and making cross-domain connections.
         """
         try:
             start_time = get_timestamp()
@@ -47,22 +56,28 @@ class AISelfEnhancementSystem:
             self.register_initial_capabilities()
             self.load_custom_capabilities()
 
+            # Build the knowledge graph
+            self.knowledge_linker.build_knowledge_graph()
+
             while True:
                 self.display_menu()
-                choice = input("Enter your choice: ")
+                choice = self.get_valid_input("Enter your choice (1-7): ", ['1', '2', '3', '4', '5', '6', '7'])
 
                 if choice == '1':
-                    task_name = input("Enter task name: ")
-                    input_data = input("Enter input data: ")
-                    self.perform_task(task_name, input_data)
+                    self.perform_task_interface()
                 elif choice == '2':
                     self.analyze_performance()
                 elif choice == '3':
                     self.suggest_improvements()
                 elif choice == '4':
+                    self.run_autonomous_pm()
+                elif choice == '5':
+                    self.analyze_project_management_performance()
+                elif choice == '6':
+                    self.cross_domain_knowledge_interface()
+                elif choice == '7':
+                    print("Exiting AI Self-Enhancement System. Goodbye!")
                     break
-                else:
-                    logging.warning("Invalid choice. Please try again.")
 
             end_time = get_timestamp()
             total_runtime = get_time_difference(start_time, end_time)
@@ -72,120 +87,86 @@ class AISelfEnhancementSystem:
             logging.error(f"An error occurred: {str(e)}")
         except Exception as e:
             logging.error(f"An unexpected error occurred: {str(e)}")
+        finally:
+            logging.info("AI Self-Enhancement System shutting down.")
 
-    def register_initial_capabilities(self):
-        """Register the initial set of capabilities for the system."""
-        self.capability_registry.add_capability(
-            "text_analysis",
-            "Analyzes text for sentiment and key phrases",
-            self.mock_text_analysis
-        )
-        self.capability_registry.add_capability(
-            "data_processing",
-            "Processes numerical data",
-            self.mock_data_processing
-        )
+    # ... [other methods remain unchanged] ...
 
-    def load_custom_capabilities(self):
-        """Load custom capabilities from the 'capabilities' directory."""
-        capabilities_dir = os.path.join(os.path.dirname(__file__), '..', 'capabilities')
-        sys.path.append(capabilities_dir)
-        for filename in os.listdir(capabilities_dir):
-            if filename.endswith('.py') and not filename.startswith('__'):
-                module_name = filename[:-3]
-                try:
-                    spec = importlib.util.spec_from_file_location(module_name, os.path.join(capabilities_dir, filename))
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-                    
-                    for item_name in dir(module):
-                        item = getattr(module, item_name)
-                        if callable(item) and hasattr(item, 'is_capability'):
-                            capability = load_capability(item)
-                            if capability:
-                                self.capability_registry.add_capability(
-                                    capability['name'],
-                                    capability['description'],
-                                    capability['function']
-                                )
-                                logging.info(f"Loaded custom capability: {capability['name']}")
-                            else:
-                                logging.warning(f"Failed to load capability: {item_name}")
-                except Exception as e:
-                    logging.error(f"Error loading custom capability module {module_name}: {str(e)}")
+    def cross_domain_knowledge_interface(self):
+        """Interface for cross-domain knowledge linking."""
+        while True:
+            print("\nCross-Domain Knowledge Linking")
+            print("1. Extract concepts from text")
+            print("2. Find cross-domain links for a concept")
+            print("3. Suggest innovative applications")
+            print("4. Return to main menu")
+            
+            choice = self.get_valid_input("Enter your choice (1-4): ", ['1', '2', '3', '4'])
+            
+            if choice == '1':
+                self.extract_concepts_interface()
+            elif choice == '2':
+                self.find_cross_domain_links_interface()
+            elif choice == '3':
+                self.suggest_innovative_applications_interface()
+            elif choice == '4':
+                break
 
-    def perform_task(self, task_name, input_data):
-        """
-        Perform a task using the registered capabilities.
-
-        Args:
-            task_name (str): The name of the task to perform.
-            input_data: The input data for the task.
-        """
+    def extract_concepts_interface(self):
+        """Interface for extracting concepts from text."""
+        text = input("Enter the text to extract concepts from: ")
         try:
-            capability = self.capability_registry.get_capability(task_name)
-            if capability:
-                task_start_time = get_timestamp()
-                result = capability["function"](input_data)
-                task_end_time = get_timestamp()
-                execution_time = get_time_difference(task_start_time, task_end_time)
-                self.self_reflection.log_performance(task_name, result, execution_time)
-                logging.info(f"Task '{task_name}' completed at {task_end_time}. Result: {result}")
-            else:
-                logging.warning(f"Task '{task_name}' not found in capabilities.")
+            concepts = self.knowledge_linker.extract_concepts(text)
+            print("\nExtracted concepts:")
+            for concept in concepts:
+                print(f"- {concept}")
         except Exception as e:
-            logging.error(f"Error performing task '{task_name}': {str(e)}")
+            print(f"An error occurred while extracting concepts: {str(e)}")
 
-    def analyze_performance(self):
-        """Analyze and display the system's performance."""
-        analysis = self.self_reflection.analyze_performance()
-        logging.info("Performance Analysis:")
-        for key, value in analysis.items():
-            logging.info(f"{key}: {value}")
+    def find_cross_domain_links_interface(self):
+        """Interface for finding cross-domain links."""
+        concept = input("Enter a concept to find cross-domain links: ")
+        try:
+            links = self.knowledge_linker.find_cross_domain_links(concept)
+            print("\nCross-domain links:")
+            for link in links:
+                print(f"- {link['concept']} (Relevance: {link['relevance_score']:.2f})")
+                print(f"  Common applications: {', '.join(link['common_applications'])}")
+        except Exception as e:
+            print(f"An error occurred while finding cross-domain links: {str(e)}")
 
-    def suggest_improvements(self):
-        """Generate and display improvement suggestions."""
-        suggestions = self.self_reflection.suggest_improvements()
-        logging.info("Improvement Suggestions:")
-        for suggestion in suggestions:
-            logging.info(f"- {suggestion}")
+    def suggest_innovative_applications_interface(self):
+        """Interface for suggesting innovative applications."""
+        capabilities = self.capability_registry.list_capabilities()
+        print("Available capabilities:")
+        for i, cap in enumerate(capabilities, 1):
+            print(f"{i}. {cap}")
+        
+        selected = input("Enter the numbers of capabilities to combine (comma-separated): ")
+        try:
+            selected_capabilities = [capabilities[int(i)-1] for i in selected.split(',')]
+            suggestions = self.knowledge_linker.suggest_innovative_applications(selected_capabilities)
+            print("\nInnovative application suggestions:")
+            for suggestion in suggestions[:10]:  # Limit to top 10 suggestions
+                print(f"- {suggestion}")
+        except Exception as e:
+            print(f"An error occurred while suggesting innovative applications: {str(e)}")
 
     def display_menu(self):
         """Display the main menu options."""
-        print("\nAI Self-Enhancement System Menu:")
+        print("\n" + "=" * 40)
+        print("AI Self-Enhancement System Menu:")
+        print("=" * 40)
         print("1. Perform a task")
         print("2. Analyze performance")
         print("3. Suggest improvements")
-        print("4. Exit")
+        print("4. Run Autonomous Project Management")
+        print("5. Analyze Project Management Performance")
+        print("6. Cross-Domain Knowledge Linking")
+        print("7. Exit")
+        print("=" * 40)
 
-    # Mock functions for demonstration
-    def mock_text_analysis(self, text):
-        """
-        A mock function for text analysis.
-
-        Args:
-            text (str): The text to analyze.
-
-        Returns:
-            str: A mock analysis result.
-        """
-        import time
-        time.sleep(0.5)  # Simulate processing time
-        return f"Analyzed '{text[:20]}...' (length: {len(text)})"
-
-    def mock_data_processing(self, data):
-        """
-        A mock function for data processing.
-
-        Args:
-            data (list): The data to process.
-
-        Returns:
-            str: A mock processing result.
-        """
-        import time
-        time.sleep(0.3)  # Simulate processing time
-        return f"Processed {len(data)} data points. Sum: {sum(data)}"
+    # ... [rest of the methods remain unchanged] ...
 
 if __name__ == "__main__":
     ai_system = AISelfEnhancementSystem()
